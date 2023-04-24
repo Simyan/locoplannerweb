@@ -1,5 +1,6 @@
 import logo from './logo.svg';
-import React from "react";
+import React, { useState } from "react";
+import axios from "axios";
 import { 
   useLoadScript, 
   GoogleMap, 
@@ -32,20 +33,37 @@ function App() {
 
   const { isLoaded, loadError } = useLoadScript({
     googleMapsApiKey: process.env.REACT_APP_GOOGLE_MAPS_API_KEY,
-    libraries,
+    libraries
   });
+
+  const [places, setPlaces] = useState([]);
+  const mapRef = React.useRef();
+  const onMapLoad = React.useCallback((map) => {
+    console.log('OnMapLoad!', {places});
+    mapRef.current = map;
+    getNearbyPlaces(center.lat, center.lng);
+  }, []);
 
   //const [markers, setMarkers] = React.useState([{lat: 41.3996068426308, lng: 2.1803083510313472}]);
   const [markers, setMarkers] = React.useState([{lat: center.lat, lng: center.lng}, {lat: 41.405352765909534, lng: 2.1911230177794083}]);
   
 
+  function callback(results, status) {
+    if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+      console.log('Nearby places response recieved');
+      console.log(results);
+      setPlaces(results);
+    }
+  }
+  const getNearbyPlaces = async (lat, lng) => {
+    const loc = new window.google.maps.LatLng(lat,lng);
+    const request = {location: loc, radius: 1200,  type: ['restaurant']};
+    let service = new window.google.maps.places.PlacesService(mapRef.current);
+    service.nearbySearch(request, callback);
+  }
 
-  // React.useEffect(() => {
-  //   console.log("intial set up of markers", markers)
-  //   setMarkers(() => [{lat: center.lat, lng: center.lng, time: new Data()}]);
-  //   console.log("intial set up of markers finished", markers)
-  // }, []);
 
+  
 
   const onMapClick = React.useCallback((e) => {
     setMarkers((current) => [
@@ -70,6 +88,7 @@ function App() {
       center={center}
       options={options}
       onClick={onMapClick}
+      onLoad={onMapLoad}
       >
 
         {markers.map((marker) => (
