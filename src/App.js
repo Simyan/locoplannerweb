@@ -107,7 +107,7 @@ function App() {
       const filteredResult = results.filter(isWorthy);
       const transformedResult = filteredResult.map(curriedMapPlace(uid))
       console.log(transformedResult);
-      setSuggestedPlaces([...suggestedPlaces, ...transformedResult]);
+      setSuggestedPlaces(current => [...current, ...transformedResult]);
       if (pagination && pagination.hasNextPage) {
        // Note: nextPage will call the same handler function as the initial call
        pagination.nextPage();
@@ -123,6 +123,9 @@ function App() {
   }
 
  
+  React.useEffect(() => {
+    console.log('final', suggestedPlaces);
+  }, [suggestedPlaces]);
 
   //#endregion
 
