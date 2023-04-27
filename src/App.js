@@ -34,11 +34,11 @@ function App() {
   });
 
   const mapRef = React.useRef();
-  
+  //sf - 41.40438634828477, 2.1743987153392155; pg - 41.41456759067538, 2.15223281580271
   //#region state
   const [savedLocations, setSavedLocations] = useState([
-    { uid: 2, placeId: '', name: 'Sagrada Familia', lat: 1, lng: 1, type: 'anchor', nearbySaves: [4, 5] },
-    { uid: 3, placeId: '', name: 'Park Guell', lat: 1, lng: 2, type: 'anchor', nearbySaves: []  },
+    { uid: 2, placeId: '', name: 'Sagrada Familia', lat: 41.40438634828477, lng: 2.1743987153392155, type: 'anchor', nearbySaves: [4, 5] },
+    { uid: 3, placeId: '', name: 'Park Guell', lat: 41.41456759067538, lng: 2.15223281580271, type: 'anchor', nearbySaves: []  },
     { uid: 4, placeId: '', name: 'Paisano Bistro', lat: 1, lng: 3, type: 'saved' },
     { uid: 5, placeId: '', name: 'KFC', lat: 1, lng: 4, type: 'saved' }]);
 
@@ -51,9 +51,11 @@ function App() {
   
   //Events - start
   const onMapLoad = React.useCallback((map) => {
-    console.log('OnMapLoad!', { places });
+    console.log('OnMapLoad!');
     mapRef.current = map;
+    console.log('az- Alright let us start our journey - 0');
     getNearbyPlacesForAnchors();
+    console.log('az- This is the end of the journey');
   }, []);
 
   const onMapClick = React.useCallback((e) => {
@@ -69,9 +71,11 @@ function App() {
   //Events - end
 
   function getNearbyPlacesForAnchors(){
-    for(var i = 0; i < savedLocations; i++ ){
+    console.log('az- getNearbyForAnchors - 1');
+    for(var i = 0; i < savedLocations.length; i++ ){
       if(savedLocations[i].type === 'anchor'){
-        getNearbyPlaces(savedLocations[i].lat, savedLocations[i].lng);
+        console.log('az- anchor found - 2');
+        getNearbyPlaces(savedLocations[i].lat, savedLocations[i].lng, savedLocations[i].uid);
       }
     } 
   }
@@ -85,29 +89,37 @@ function App() {
   }
 
   //restaraunt -> rating / total ratings (user_ratings_total) / opening hours / price point / restaraunt-type
-  function mapPlace(item){
-    return { rating: item.rating, totalRatings: item.user_ratings_total, price: item.price_level, placeId: item.place_id }
+  function curriedMapPlace(uid){
+    return function (item){
+      console.log('az- Inside mapPlace - 5');
+      return { name: item.name, rating: item.rating, totalRatings: item.user_ratings_total, price: item.price_level, placeId: item.place_id, anchorUId: uid }
+    }
   }
+  
+  
 
-  function setPlacesCallback(results, status, pagination) {
+  function setPlacesCallback(results, status, pagination, uid) {
+    console.log('az- Inside callback - 4');
     if (status === window.google.maps.places.PlacesServiceStatus.OK) {
       console.log('Nearby places response recieved');
-      console.log(results);
-      
+      //console.log(results);
+      console.log('uid: ' + uid);
       const filteredResult = results.filter(isWorthy);
-      const transformedResult = filteredResult.map(mapPlace)
-      setSuggestedPlaces(transformedResult);
+      const transformedResult = filteredResult.map(curriedMapPlace(uid))
+      console.log(transformedResult);
+      setSuggestedPlaces([...suggestedPlaces, ...transformedResult]);
       if (pagination && pagination.hasNextPage) {
        // Note: nextPage will call the same handler function as the initial call
        pagination.nextPage();
       }
     }
   }
-  const getNearbyPlaces = async (lat, lng) => {
+  const getNearbyPlaces = async (lat, lng, uid) => {
+    console.log(`az- getNearbyPlaces for anchor ${uid} - 3`);
     const loc = new window.google.maps.LatLng(lat, lng);
     const request = { location: loc, radius: 1200, type: ['restaurant'] };
     let service = new window.google.maps.places.PlacesService(mapRef.current);
-    service.nearbySearch(request, setPlacesCallback);
+    service.nearbySearch(request, function (results, status, pagination){setPlacesCallback(results, status, pagination, uid)});
   }
 
  
