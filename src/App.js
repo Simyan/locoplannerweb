@@ -21,6 +21,7 @@ import {
 import "@reach/combobox/styles.css";
 import Dropdown from 'react-dropdown';
 import 'react-dropdown/style.css';
+import Card from './Card';
 
 const libraries = ['places']
 const mapContainerStyle = {
@@ -41,11 +42,11 @@ const center = {
   uid: 1,
   lat: 41.3996068426308,
   lng: 2.1803083510313472,
-  type: 'home'
+  type: 'home',
+  placeId: 'ABNB'
 };
 
 const daysOptions = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
-const defaultOption = 1;
 
 function App() {
 
@@ -60,22 +61,40 @@ function App() {
   //sf - 41.40438634828477, 2.1743987153392155; pg - 41.41456759067538, 2.15223281580271
   //#region state
   const [savedLocations, setSavedLocations] = useState([
-    { uid: 2, placeId: '', name: 'Sagrada Familia', lat: 41.40438634828477, lng: 2.1743987153392155, type: 'anchor', nearbySaves: [4, 5], isNearbySearchDone: false },
-    { uid: 3, placeId: '', name: 'Park Guell', lat: 41.41456759067538, lng: 2.15223281580271, type: 'anchor', nearbySaves: [], isNearbySearchDone: false },
-    { uid: 4, placeId: '', name: 'Paisano Bistro', lat: 1, lng: 3, type: 'saved' },
-    { uid: 5, placeId: '', name: 'KFC', lat: 1, lng: 4, type: 'saved' }]);
+    { uid: 2, placeId: 'SAG', name: 'Sagrada Familia', lat: 41.40438634828477, lng: 2.1743987153392155, type: 'anchor', nearbySaves: [4, 5], isNearbySearchDone: false, rating: 4.5},
+    { uid: 3, placeId: 'GUE', name: 'Park Guell', lat: 41.41456759067538, lng: 2.15223281580271, type: 'anchor', nearbySaves: [], isNearbySearchDone: false, rating: 4.6 },
+    { uid: 4, placeId: 'PAI', name: 'Paisano Bistro', lat: 1, lng: 3, type: 'saved', rating: 4.3, totalRatings: 500, price: 4 },
+    { uid: 5, placeId: 'KFC123', name: 'KFC', lat: 1, lng: 4, type: 'saved', rating: 3.4, totalRatings: 4310, price: 2 }]);
 
   const [suggestedPlaces, setSuggestedPlaces] = useState([]);
-  const [markers, setMarkers] = React.useState([{ lat: center.lat, lng: center.lng }, { lat: 41.405352765909534, lng: 2.1911230177794083 }]);
+  const [selectedAnchor, setSelectedAnchor] = useState(0);
+  const [markers, setMarkers] = React.useState([{ lat: center.lat, lng: center.lng }]);
+  // const [markers, setMarkers] = React.useState([{ lat: center.lat, lng: center.lng }, { lat: 41.405352765909534, lng: 2.1911230177794083 }]);
   //#endregion
 
 
   //#region functions
 
+  const renderMarkers = function (e) {
+
+    console.log('Setting markers:' + e.lat)
+    setMarkers((current) => [
+      ...current,
+      {
+        lat: e.lat,
+        lng: e.lng,
+        time: new Date(),
+      },
+    ]);
+  }
+
   //Events - start
   const onMapLoad = React.useCallback((map) => {
     console.log('OnMapLoad!');
     mapRef.current = map;
+
+    savedLocations.map(e => renderMarkers(e))
+
     console.log('az- Alright let us start our journey - 0');
     getNearbyPlacesForAnchors();
     console.log('az- This is the end of the journey');
@@ -116,7 +135,7 @@ function App() {
       if (savedLocations[i].type === 'anchor' && !savedLocations[i].isNearbySearchDone) {
         console.log('az- anchor found - 2');
         updateSavedLocation(i, { ...savedLocations[i], isNearbySearchDone: true })
-        getNearbyPlaces(savedLocations[i].lat, savedLocations[i].lng, savedLocations[i].uid);
+        getNearbyPlaces(savedLocations[i].lat, savedLocations[i].lng, savedLocations[i].placeId);
       }
     }
   }
@@ -130,23 +149,23 @@ function App() {
   }
 
   //restaraunt -> rating / total ratings (user_ratings_total) / opening hours / price point / restaraunt-type
-  function curriedMapPlace(uid) {
+  function curriedMapPlace(anchorPlaceId) {
     return function (item) {
       console.log('az- Inside mapPlace - 5');
-      return { name: item.name, rating: item.rating, totalRatings: item.user_ratings_total, price: item.price_level, placeId: item.place_id, anchorUId: uid }
+      return { name: item.name, rating: item.rating, totalRatings: item.user_ratings_total, price: item.price_level, placeId: item.place_id, anchorPlaceId: anchorPlaceId }
     }
   }
 
 
 
-  function setPlacesCallback(results, status, pagination, uid) {
+  function setPlacesCallback(results, status, pagination, anchorPlaceId) {
     console.log('az- Inside callback - 4');
     if (status === window.google.maps.places.PlacesServiceStatus.OK) {
       console.log('Nearby places response recieved');
       //console.log(results);
-      console.log('uid: ' + uid);
+      console.log('anchorPlaceId: ' + anchorPlaceId);
       const filteredResult = results.filter(isWorthy);
-      const transformedResult = filteredResult.map(curriedMapPlace(uid))
+      const transformedResult = filteredResult.map(curriedMapPlace(anchorPlaceId))
       console.log(transformedResult);
       setSuggestedPlaces(current => [...current, ...transformedResult]);
       if (pagination && pagination.hasNextPage) {
@@ -155,12 +174,20 @@ function App() {
       }
     }
   }
-  const getNearbyPlaces = async (lat, lng, uid) => {
-    console.log(`az- getNearbyPlaces for anchor ${uid} - 3`);
+  const getNearbyPlaces = async (lat, lng, anchorPlaceId) => {
+    console.log(`az- getNearbyPlaces for anchor ${anchorPlaceId} - 3`);
     const loc = new window.google.maps.LatLng(lat, lng);
     const request = { location: loc, radius: 1200, type: ['restaurant'] };
     let service = new window.google.maps.places.PlacesService(mapRef.current);
-    service.nearbySearch(request, function (results, status, pagination) { setPlacesCallback(results, status, pagination, uid) });
+    service.nearbySearch(request, function (results, status, pagination) { setPlacesCallback(results, status, pagination, anchorPlaceId) });
+  }
+
+  const mapPriceLevel = (priceLevel) => {
+    var dollars = ["🆓", "💲", "💲💲", "💲💲💲" , "💀"]
+    if(!priceLevel)
+      return ''
+    
+    return dollars[priceLevel];
   }
 
 
@@ -175,39 +202,77 @@ function App() {
   if (!isLoaded) return "Loading...";
 
   return (
-    <div>
-      <Search panTo={panTo} savedLocations={savedLocations} setSavedLocations={setSavedLocations} getNearbyPlacesForAnchors={getNearbyPlacesForAnchors} />
-      <GoogleMap
-        id="map"
-        mapContainerStyle={mapContainerStyle}
-        zoom={15}
-        center={center}
-        options={options}
-        onClick={onMapClick}
-        onLoad={onMapLoad}
-      >
+     <div className="pageContainer">
+      
+      <div className="mapContainer">
+        <Search panTo={panTo} savedLocations={savedLocations} setSavedLocations={setSavedLocations} getNearbyPlacesForAnchors={getNearbyPlacesForAnchors} renderMarkers={renderMarkers} />
+       
+        <GoogleMap
+          id="map"
+          mapContainerStyle={mapContainerStyle}
+          zoom={15}
+          center={center}
+          options={options}
+          onClick={onMapClick}
+          onLoad={onMapLoad}
+        >
 
-        {markers.map((marker) => (
-          <MarkerF
-            key={`${marker.lat}-${marker.lng}`}
-            position={{ lat: marker.lat, lng: marker.lng }}
+          {markers.map((marker) => (
+            <MarkerF
+              key={`${marker.lat}-${marker.lng}-${marker.time}`}
+              position={{ lat: marker.lat, lng: marker.lng }}
+              onClick={() => {
+                console.log('setting selected anchor - 1', marker);
+                console.log('setting selected anchor - 1.1', savedLocations.map(x => `${x.lat}-${x.lng}`));
+                const anchorPlaceId = savedLocations.find(x => x.lat === marker.lat && x.lng === marker.lng && x.type === 'anchor')?.placeId;
+                console.log('setting selected anchor - 2: ' , anchorPlaceId);
+                if(anchorPlaceId) setSelectedAnchor(anchorPlaceId);
+              }}
+            />
+          ))}
+          {/* <Polyline path={markers}></Polyline> */}
 
-          />
-        ))}
-        <Polyline path={markers}></Polyline>
+        </GoogleMap>
+      </div>
+      <div className="detailsContainer">
+        
+        <p>SELECTED ANCHOR - {savedLocations.find(x => x.placeId === selectedAnchor)?.name}</p>
+        {
+            suggestedPlaces
+            .filter((item) => item.anchorPlaceId == selectedAnchor)
+            .map((item) => (<
+              Card title={item.name} 
+              info={`${item.rating ? item.rating : 'NA'}⭐ 
+                    ${item.totalRatings ? item.totalRatings : 'NA'}😺 
+                    ${mapPriceLevel(item.price)}`}/>))
+        }
+        <p>ANCHORS AND SAVED LOCATIONS</p>
+         {
+           savedLocations.map((item) => (<
+            Card title={item.name} 
+            info={`${item.rating ? item.rating : 'NA'}⭐ 
+                  ${item.totalRatings ? item.totalRatings : 'NA'}😺 
+                  ${mapPriceLevel(item.price)}`}/>))
+         }   
+      
+        
+      </div>
 
-      </GoogleMap>
+      
     </div>
+  
+    
+
   );
 }
 
-function Search({ panTo, savedLocations, setSavedLocations, getNearbyPlacesForAnchors }) {
+function Search({ panTo, savedLocations, setSavedLocations, getNearbyPlacesForAnchors, renderMarkers}) {
   const [isAnchor, setIsAnchor] = React.useState(false);
   const [isExecute, setIsExecute] = React.useState(0);
   const [newEntryData, setNewEntryData] = React.useState({});
 
   const [isNewEntryFieldsVisible, setIsNewEntryFieldsVisible] = React.useState(false);
-  const [selectedDay, setSelectedDay] = React.useState(defaultOption);
+  const [selectedDay, setSelectedDay] = React.useState(0);
   const {
     ready,
     value,
@@ -222,6 +287,7 @@ function Search({ panTo, savedLocations, setSavedLocations, getNearbyPlacesForAn
   });
 
   React.useEffect(() => {
+    
     getNearbyPlacesForAnchors();
   }, [isExecute]);
 
@@ -229,6 +295,7 @@ function Search({ panTo, savedLocations, setSavedLocations, getNearbyPlacesForAn
   // https://developers.google.com/maps/documentation/javascript/reference/places-autocomplete-service#AutocompletionRequest
 
   const handleInput = (e) => {
+    console.log(e.target.value);
     setValue(e.target.value);
     setIsNewEntryFieldsVisible(true);
     if (!e.target.value || e.target.value === '') setIsNewEntryFieldsVisible(false);
@@ -244,21 +311,22 @@ function Search({ panTo, savedLocations, setSavedLocations, getNearbyPlacesForAn
     getDetails(parameter)
       .then((details) => {
         console.log("response of get place details api: ", details);
-        const newLocation = { 
-          uid: 6, 
-          placeId: placeId, 
-          name: value, 
-          lat: newEntryData.lat, 
-          lng: newEntryData.lng, 
+        const newLocation = {
+          uid: 6,
+          placeId: placeId,
+          name: value,
+          lat: newEntryData.lat,
+          lng: newEntryData.lng,
           type: isAnchor ? 'anchor' : 'saved',
           rating: details.rating,
           price: details.price_level,
-          totalRatings: details.user_ratings_total, 
-          isNearbySearchDone: false 
+          totalRatings: details.user_ratings_total,
+          isNearbySearchDone: false
         }
 
         setSavedLocations(current => [...current, newLocation]);
         if (isAnchor) {
+          renderMarkers(newLocation);
           setIsExecute(x => ++x);
         }
 
@@ -308,7 +376,7 @@ function Search({ panTo, savedLocations, setSavedLocations, getNearbyPlacesForAn
             disabled={!ready}
             placeholder="Search your location"
           />
-          <ComboboxPopover>
+          <ComboboxPopover style={{ zIndex: 3000 }}>
             <ComboboxList>
               {status === "OK" &&
                 data.map(({ place_id, description }) => (
@@ -335,8 +403,8 @@ function Search({ panTo, savedLocations, setSavedLocations, getNearbyPlacesForAn
           options={daysOptions}
           onChange={setSelectedDay}
           value={selectedDay}
-          placeholder="Select a day (optional)"
-        />;
+          placeholder={"Select a day (optional)"}
+        />
 
         <button
           type="submit"
